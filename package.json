@@ -1,0 +1,36 @@
+{
+  "name": "nice-travel",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/domain",
+    "packages/providers",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@nice-travel/web",
+    "build": "npm run build --workspaces --if-present",
+    "type-check": "tsc --noEmit -p tsconfig.typecheck.json",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prisma:validate": "node scripts/prisma-validate.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prettier": "^3.3.3",
+    "prisma": "^6.0.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.1"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.8"
+  }
+}

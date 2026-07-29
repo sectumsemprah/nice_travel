@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TripStatus {
+  draft
+  planning
+  ready
+  traveling
+  completed
+  archived
+}
+
+enum SourceStatus {
+  pending
+  imported
+  processed
+  failed
+}
+
+enum JobStatus {
+  pending
+  running
+  succeeded
+  failed
+  canceled
+}
+
+enum ShareScope {
+  trip
+  album
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  name               String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  trips              Trip[]
+  preferenceProfiles PreferenceProfile[]
+  memoryAssets       MemoryAsset[]
+}
+
+model Trip {
+  id                 String              @id @default(uuid())
+  ownerId            String
+  owner              User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title              String
+  destination        String
+  startDate          DateTime
+  endDate            DateTime
+  budgetCny          Int?
+  status             TripStatus          @default(planning)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  preferenceProfile  PreferenceProfile?
+  sources            TravelSource[]
+  insights           TravelInsight[]
+  places             Place[]
+  itineraryDays      ItineraryDay[]
+  routes             RouteSnapshot[]
+  memoryAssets       MemoryAsset[]
+  memoryAlbums       MemoryAlbum[]
+  jobs               Job[]
+  shareTokens        ShareToken[]
+  exports            ExportRecord[]
+
+  @@index([ownerId, status])
+  @@index([destination])
+}
+
+model PreferenceProfile {
+  id                 String   @id @default(uuid())
+  userId             String
+  tripId             String?  @unique
+  interests          String[]
+  pace               String
+  budgetLevel        String
+  companions         String
+  transportModes     String[]
+  avoidances         String[]
+  accessibilityNeeds String[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip               Trip?    @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model TravelSource {
+  id            String       @id @default(uuid())
+  tripId        String
+  trip          Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  provider      String
+  sourceType    String
+  title         String
+  url           String?
+  excerpt       String
+  status        SourceStatus @default(pending)
+  copyrightNote String
+  errorMessage  String?
+  createdAt     DateTime     @default(now())
+  processedAt   DateTime?
+  insights      TravelInsightSource[]
+
+  @@index([tripId, provider])
+  @@index([status])
+}
+
+model TravelInsight {
+  id          String                @id @default(uuid())
+  tripId      String
+  trip        Trip                  @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  placeName   String
+  summary     String
+  tags        String[]
+  avoidTips   String[]
+  heatScore   Float
+  confidence  Float
+  createdAt   DateTime              @default(now())
+  sources     TravelInsightSource[]
+  places      PlaceInsight[]
+
+  @@index([tripId])
+  @@index([placeName])
+}
+
+model TravelInsightSource {
+  insightId String
+  sourceId  String
+  insight   TravelInsight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+  source    TravelSource  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@id([insightId, sourceId])
+}
+
+model Place {
+  id               String            @id @default(uuid())
+  tripId           String
+  trip             Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  name             String
+  address          String
+  lat              Float?
+  lng              Float?
+  tags             String[]
+  score            Float
+  openingHint      String?
+  estimatedCostCny Int?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  insights         PlaceInsight[]
+  itineraryItems   ItineraryItem[]
+  memoryAssets     MemoryAsset[]
+
+  @@index([tripId, name])
+}
+
+model PlaceInsight {
+  placeId   String
+  insightId String
+  place     Place         @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  insight   TravelInsight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+
+  @@id([placeId, insightId])
+}
+
+model ItineraryDay {
+  id        String          @id @default(uuid())
+  tripId    String
+  trip      Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  dayNumber Int
+  date      DateTime
+  title     String
+  version   Int             @default(1)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  items     ItineraryItem[]
+
+  @@unique([tripId, dayNumber, version])
+  @@index([tripId, date])
+}
+
+model ItineraryItem {
+  id              String       @id @default(uuid())
+  itineraryDayId  String
+  itineraryDay    ItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  placeId         String
+  place           Place        @relation(fields: [placeId], references: [id], onDelete: Restrict)
+  startTime       String
+  durationMinutes Int
+  transportMode   String
+  reason          String
+  riskHints       String[]
+  sortOrder       Int
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([itineraryDayId, sortOrder])
+}
+
+model RouteSnapshot {
+  id              String   @id @default(uuid())
+  tripId          String
+  trip            Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  provider        String
+  status          String
+  distanceKm      Float
+  durationMinutes Int
+  pointsJson      Json
+  renderedText    String
+  createdAt       DateTime @default(now())
+
+  @@index([tripId, createdAt])
+}
+
+model MemoryAsset {
+  id         String    @id @default(uuid())
+  tripId     String
+  ownerId    String
+  placeId    String?
+  trip       Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  owner      User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  place      Place?    @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  fileName   String
+  url        String
+  caption    String?
+  takenAt    DateTime?
+  visibility String    @default("private")
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime?
+
+  @@index([tripId, deletedAt])
+  @@index([ownerId])
+}
+
+model MemoryAlbum {
+  id           String   @id @default(uuid())
+  tripId       String
+  trip         Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  version      Int
+  title        String
+  coverAssetId String?
+  narrative    String
+  sectionsJson Json
+  createdAt    DateTime @default(now())
+
+  @@unique([tripId, version])
+  @@index([tripId, createdAt])
+}
+
+model Job {
+  id           String    @id @default(uuid())
+  tripId       String
+  trip         Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type         String
+  status       JobStatus  @default(pending)
+  traceId      String
+  errorMessage String?
+  retryCount   Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([tripId, status])
+  @@index([traceId])
+}
+
+model ShareToken {
+  id        String     @id @default(uuid())
+  tripId    String
+  trip      Trip       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  tokenHash String     @unique
+  scope     ShareScope
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime   @default(now())
+
+  @@index([tripId, revokedAt])
+}
+
+model ExportRecord {
+  id           String    @id @default(uuid())
+  tripId       String
+  trip         Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  status       JobStatus  @default(pending)
+  format       String
+  url          String?
+  errorMessage String?
+  createdAt    DateTime   @default(now())
+  completedAt  DateTime?
+
+  @@index([tripId, status])
+}
+
